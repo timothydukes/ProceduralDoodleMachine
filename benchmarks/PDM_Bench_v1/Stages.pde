@@ -1,3 +1,4 @@
+// v2: random()/randomSeed() moved to sketch scope (not PGraphics methods).
 // Stage definitions and load renderers for the automated battery.
 //
 // Every test draws into an offscreen PGraphics at the tier resolution
@@ -48,10 +49,10 @@ void loadLines(PGraphics g, int n) {
   g.beginDraw();
   g.background(0);
   g.strokeWeight(1);
-  g.randomSeed(1234);           // identical geometry every frame of a window
+  randomSeed(1234);           // identical geometry every frame of a window
   for (int i = 0; i < n; i++) {
     g.stroke((i * 7) % 360, 100, 100);
-    g.line(g.random(g.width), g.random(g.height), g.random(g.width), g.random(g.height));
+    g.line(random(g.width), random(g.height), random(g.width), random(g.height));
   }
   g.endDraw();
 }
@@ -64,14 +65,14 @@ void loadCurves(PGraphics g, int totalVerts) {
   g.background(0);
   g.noFill();
   g.strokeWeight(1);
-  g.randomSeed(2345);
+  randomSeed(2345);
   for (int i = 0; i < lines; i++) {
     g.stroke((i * 13) % 360, 100, 100);
     g.beginShape();
-    float x = g.random(g.width), y = g.random(g.height);
+    float x = random(g.width), y = random(g.height);
     for (int v = 0; v < perLine; v++) {
-      x += g.random(-40, 40);
-      y += g.random(-40, 40);
+      x += random(-40, 40);
+      y += random(-40, 40);
       g.curveVertex(x, y);
     }
     g.endShape();
@@ -90,19 +91,19 @@ void loadSketchy(PGraphics g, int strokes) {
   g.beginDraw();
   g.background(0);
   g.strokeWeight(1.5);
-  g.randomSeed(3456);
+  randomSeed(3456);
   float ca = cos(QUARTER_PI), sa = sin(QUARTER_PI);
   for (int i = 0; i < strokes; i++) {
     g.stroke((i * 11) % 360, 90, 100);
-    float x1 = g.random(g.width),  y1 = g.random(g.height);
-    float x2 = x1 + g.random(-160, 160), y2 = y1 + g.random(-160, 160);
+    float x1 = random(g.width),  y1 = random(g.height);
+    float x2 = x1 + random(-160, 160), y2 = y1 + random(-160, 160);
     for (int pass = 0; pass < 2; pass++) {
       float j = 2.5;
-      g.line(x1 + g.random(-j, j), y1 + g.random(-j, j),
-             x2 + g.random(-j, j), y2 + g.random(-j, j));
+      g.line(x1 + random(-j, j), y1 + random(-j, j),
+             x2 + random(-j, j), y2 + random(-j, j));
     }
     if (i % 20 == 0) {  // hachure-filled circle
-      float cx = g.random(g.width), cy = g.random(g.height), r = 40;
+      float cx = random(g.width), cy = random(g.height), r = 40;
       for (int k = -5; k <= 5; k++) {
         float d = k * r / 6.0;
         float half = sqrt(max(r * r - d * d, 0));
@@ -122,12 +123,12 @@ void loadAlpha(PGraphics g, int n) {
   g.noStroke();
   g.fill(0, 0, 0, 10);              // full-buffer translucent trail wipe
   g.rect(0, 0, g.width, g.height);
-  g.randomSeed(4567);
+  randomSeed(4567);
   float t = millis() / 1000.0;
   for (int i = 0; i < n; i++) {
     g.fill((i * 17) % 360, 100, 100, 20);
-    float x = g.random(g.width) + 30 * sin(t + i);
-    g.ellipse(x, g.random(g.height), 60, 60);
+    float x = random(g.width) + 30 * sin(t + i);
+    g.ellipse(x, random(g.height), 60, 60);
   }
   g.endDraw();
 }
@@ -153,10 +154,10 @@ void loadBuffers(int resIx, int K) {
     b.beginDraw();
     b.clear();
     b.strokeWeight(1);
-    b.randomSeed(100 + i);
+    randomSeed(100 + i);
     for (int L = 0; L < 50; L++) {
       b.stroke((i * 40 + L * 5) % 360, 100, 100);
-      b.line(b.random(b.width), b.random(b.height), b.random(b.width), b.random(b.height));
+      b.line(random(b.width), random(b.height), random(b.width), random(b.height));
     }
     b.endDraw();
   }
@@ -171,10 +172,10 @@ void loadFilter(PGraphics g, int passes) {
   g.beginDraw();
   g.background(0);
   g.noStroke();
-  g.randomSeed(6789);
+  randomSeed(6789);
   for (int i = 0; i < 20; i++) {
     g.fill((i * 31) % 360, 100, 100);
-    g.ellipse(g.random(g.width), g.random(g.height), 120, 120);
+    g.ellipse(random(g.width), random(g.height), 120, 120);
   }
   genShader.set("time", (float) (millis() / 1000.0));
   for (int p = 0; p < passes; p++) g.filter(genShader);
