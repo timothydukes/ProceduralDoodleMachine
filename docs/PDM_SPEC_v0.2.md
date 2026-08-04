@@ -1,13 +1,14 @@
-# PDM_SPEC v0.1 — Procedural Doodle Machine
+# PDM_SPEC v0.2 — Procedural Doodle Machine
 
 A specification for a MIDI-controlled Processing video synthesizer dedicated to
 procedural-doodle computer graphics. Given this spec and a description of an
 animation style, a developer (human or LLM) should be able to produce a
 complete style class conforming to the instrument.
 
-Status: DRAFT v0.1 — pending review. Items marked **[INTERPRETIVE]** are
-implementation choices made by the spec author where the requirements left a
-gap; each requires explicit approval or revision.
+Status: v0.2 — v0.1 (approved) + Phase 0 benchmark results folded into §3.
+Changes from v0.1 are confined to §3, new §3.1, and §9. One new
+**[INTERPRETIVE]** item (renderer choice, §3) awaits approval; all v0.1
+interpretive items were approved as delivered.
 
 ---
 
@@ -45,21 +46,58 @@ gap; each requires explicit approval or revision.
 - Final-phase goal: Pi boots headless directly into the instrument. During
   development, launched from the desktop.
 
-## 3. Rendering conventions
+## 3. Rendering (locked by Phase 0; see benchmarks/RESULTS_v1.md)
 
 - `fullScreen()` and `noCursor()` always.
 - `colorMode(HSB, 360, 100, 100, 100)` globally.
-- Renderer (JAVA2D / P2D / P3D) and GLSL policy: **decided by Phase 0
-  benchmarking on the Pi** (§9). GLSL is desired wherever the Pi supports it
-  at acceptable cost.
-- Working performance target pending Phase 0: 720p @ 30 fps.
-- Frame-rate guardrails: each style declares its own FPS floor and its own
-  degradation mechanism (internal resolution drop, element-count reduction,
-  or both), chosen during that style's study phase. Floors are discovered by
-  playing the instrument, not fixed in advance.
+- Renderer: **P3D**. **[INTERPRETIVE]** Phase 0 measured P2D and P3D as
+  equivalent on the Pi and JAVA2D as unusable, so the choice is free on
+  performance grounds; P3D is selected because one planned style family is
+  explicitly 3-D (one-point perspective mode), and P3D provides real 3-D
+  transforms where P2D would require manual projection. Cost of reversal to
+  P2D later: one line plus per-style retesting.
+- Internal render resolution: **1280×720, fixed**. 1080p internal is
+  prohibited on the Pi (Phase 0: no nontrivial style survives it). The Pi's
+  HDMI output should also run at 1280×720 so the final composite stays 1:1;
+  upscaling to a 1080p display adds unmeasured blit cost.
+- Performance floor: **30 fps**, confirmed as the working pass/fail line.
+- GLSL policy: **narrow but open.** At most **one lightweight texture-warp
+  shader pass per frame** (feedback-style). Heavy per-pixel generative
+  shaders and multi-pass chains are prohibited (a single `filter()` pass of
+  a moderate generative shader ran at 21 fps on the Pi). Any style that uses
+  its one shader pass must prove it inside that style's study sketch on the
+  Pi before porting.
+- Frame-rate guardrails: each style declares its own FPS floor and
+  degradation mechanism, chosen during its study phase. Primary lever:
+  element-count reduction (budgets in §3.1 leave room for this). Secondary
+  lever: internal resolution drop to 960×540. Raising resolution is never a
+  lever.
+- Thermal: Phase 0 soak showed zero throttling over 20 minutes at working
+  load (SoC max 47.2 °C) in the current physical setup; sustained sets are
+  safe. Re-verify if the Pi's case/cooling changes.
 - Temporality is a per-style property: some styles accumulate marks (with
   clearing, pruning, or fading of old marks), others clear every frame and
   animate moving figures.
+
+### 3.1 Per-frame complexity budgets (Pi, 720p internal)
+
+Budgets sit ~⅓ below the measured cliff to leave room for style logic and
+degradation headroom. A style's nominal (pre-degradation) load must fit the
+budget; the measured max is the absolute ceiling.
+
+| Resource per frame                                   | Measured max | Budget |
+|------------------------------------------------------|--------------|--------|
+| Long full-field lines                                | 2000         | 1300   |
+| Short sketchy strokes (≤~160 px, double-drawn)       | 4000         | 2600   |
+| `curveVertex` vertices                               | 2000         | 1300   |
+| Translucent ~60 px ellipses over a full-screen wipe  | 800          | 500    |
+| Extra full-res offscreen buffers composited          | 2            | 2 (prefer 1) |
+| Light shader warp passes                             | 1            | 1      |
+| Heavy generative shader passes                       | 0            | 0      |
+
+Costs are rasterization-bound: budgets scale with drawn pixel length/area,
+not primitive count (4000 short strokes pass where 4000 full-field lines
+fail). Styles mixing categories must stay proportionally under budget.
 
 ## 4. Control surface
 
@@ -95,20 +133,15 @@ per style during its study phase.
 
 Raw knob value `v ∈ [0,1]` maps to rotation `θ ∈ [−π, +π]` with a flat zero
 zone: `v ∈ (0.47, 0.53)` maps to exactly 0, and the mapping is smooth
-(C¹-continuous) outside the zone.
-
-**[INTERPRETIVE]** Concrete candidate: for `v ≥ 0.53`,
-`θ = π · smoothstep-remap((v − 0.53)/0.47)`; mirrored for `v ≤ 0.47`. Whether
-the approach to the detent edge is linear or eased is an aesthetic call to be
-settled the first time it's played.
+(C¹-continuous) outside the zone. Concrete curve (approved v0.1): for
+`v ≥ 0.53`, `θ = π · smoothstep-remap((v − 0.53)/0.47)`; mirrored below.
+Edge easing is tuned the first time it's played.
 
 ### 4.4 Master speed curve
 
 Fixed points: `f(0) = 0` (frozen), `f(0.5) = 1`, `f(1) = 5`, roughly
-exponential. The 5× ceiling is negotiable after aesthetic testing.
-
-**[INTERPRETIVE]** Concrete candidate satisfying all three fixed points
-exactly: `speed(v) = (16^v − 1) / 3`.
+exponential. Approved curve: `speed(v) = (16^v − 1) / 3`. The 5× ceiling is
+negotiable after aesthetic testing.
 
 All styles consume a single shared clock: `t += dt · speed`. Continuous time
 only; no tempo or beat concept exists anywhere in the instrument.
@@ -155,10 +188,10 @@ the same style must map identically in both.
   library, adapted algorithm, and inspiration source, with URL, author,
   original license, and a note on what was modified.
 - Vendored files retain their original license headers. Original PDM code is
-  MIT-licensed. **[INTERPRETIVE]** If a vendored library's copyleft terms
-  conflict with distributing the combined work this way, the conflict is
-  flagged at vendoring time with options (relicense the repo vs. reimplement
-  the technique with citation).
+  MIT-licensed. If a vendored library's copyleft terms conflict with
+  distributing the combined work this way, the conflict is flagged at
+  vendoring time with options (relicense the repo vs. reimplement the
+  technique with citation).
 - Known intended sources so far: Handy (Jo Wood, giCentre — hand-drawn
   sketchy rendering, native Processing); techniques from Wood et al.,
   "Sketchy Rendering for Information Visualization" (also the basis of
@@ -166,9 +199,6 @@ the same style must map identically in both.
   style; nanoKONTROL2 access library TBD (korgnano or equivalent, vendored).
 
 ## 7. Program architecture
-
-**[INTERPRETIVE]** — the interface below is a proposal codifying the
-requirements in §1 and §4; approve or revise before Phase 1.
 
 - Single Processing sketch folder. One `.pde` tab per style class, plus core
   tabs: main (setup/draw/orchestration), MIDI input, palette system, shared
@@ -197,7 +227,7 @@ class DoodleStyle {
 
 - Accumulating modes own their persistent `PGraphics` buffer(s); animating
   modes draw to the shared frame. Buffer lifecycle (create on activate,
-  release on deactivate) is the mode's responsibility.
+  release on deactivate) is the mode's responsibility. Budget: §3.1.
 - Boot state: style 1, mode 1, parameters read from physical positions.
 
 ## 8. Repository
@@ -207,7 +237,7 @@ class DoodleStyle {
 ```
 ProceduralDoodleMachine/       # main Processing sketch
 studies/                       # one self-contained sketch per style candidate
-benchmarks/                    # Phase 0 suite + results tables
+benchmarks/                    # Phase 0 suite + results + analysis
 docs/                          # PDM_SPEC, CREDITS.md, INSTALL.md, FORK_GUIDE.md
 ```
 
@@ -223,14 +253,11 @@ docs/                          # PDM_SPEC, CREDITS.md, INSTALL.md, FORK_GUIDE.md
 
 ## 9. Development phases
 
-- **Phase 0 — Pi benchmarking (robust and expansive).** Renderer comparison
-  (JAVA2D/P2D/P3D), line/stroke throughput at 720p and 1080p (raw primitives
-  and Handy-style multi-stroke rendering), offscreen PGraphics costs,
-  alpha-blend fill rate, GLSL support and cost on the V3D driver (full-res
-  fragment passes, ping-pong feedback), MIDI latency sanity check, thermal
-  throttling over a sustained 20-minute run. Output: results tables committed
-  to `benchmarks/`, and hard budgets + renderer/GLSL policy written back into
-  this spec (v0.2).
+- **Phase 0 — Pi benchmarking. COMPLETE.** Results and analysis:
+  `benchmarks/RESULTS_v1.md`; raw CSVs and summaries committed alongside.
+  Outcomes locked into §3/§3.1: renderer P3D (pending approval), 720p
+  internal, 30 fps floor, one-light-shader-pass GLSL policy, complexity
+  budgets, thermal clearance, MIDI pipeline confirmed.
 - **Phase 1 — Skeleton.** Main sketch: MIDI layer, global controls, palette
   system, style/mode switching, clock, with placeholder styles.
 - **Phases 2..n — Style studies.** One style at a time: brainstorm → study
@@ -242,5 +269,4 @@ Every phase gates on explicit approval before implementation.
 
 ---
 
-*PDM_SPEC v0.1 — draft for review. Changes on approval are folded into v0.2
-along with Phase 0 results.*
+*PDM_SPEC v0.2 — supersedes v0.1. Open item: renderer choice (§3).*
